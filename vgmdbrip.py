@@ -7,6 +7,10 @@ import pickle
 import requests
 from bs4 import BeautifulSoup
 
+from pathlib import Path
+import re
+import sys
+
 scriptdir = os.sep.join(argv[0].split("\\")[:-1])
 config = os.path.join(scriptdir, 'vgmdbrip.pkl')
 session = requests.Session()
@@ -68,26 +72,79 @@ if(len(argv) < 2):
 
 login()
 soup = ""
-if(argv[1].isnumeric()):
-  soup = Soup(session.get("https://vgmdb.net/album/" + argv[1]).content)
-else:
-  query = " ".join(argv[1:])
-  soup = Soup(session.get("https://vgmdb.net/search?q=\"" + query + "\"").content)
-  if(soup.title.text[:6] == "Search"):
-    print("stuck at search results")
-    exit(1)
-print('Title: ' + soup.title.text)
-folder = "Scans (VGMdb)"
-gallery = soup.find("div", attrs={"class" : "covertab",
-                                  "id" : "cover_gallery"})
-for scan in gallery.find_all("a", attrs={"class" : "highslide"}):
-  url = scan["href"]
-  title = remove(scan.text.strip(), "\"*/:<>?\|")
-  image = session.get(url).content
-  ensure_dir(folder + os.sep)
-  filename = title + url[-4:]
-  with open(os.path.join(folder, filename), "wb") as f:
-      f.write(image)
 
-  print(title + " downloaded")
-pickle.dump(session, open(config, "wb"))
+def downloadVGMDBArt(query):
+    # If query is to a file or folder that exists:
+    if os.path.exists(query):
+        if os.path.isfile(query):
+            os.chdir(os.path.dirname(query))  # Change to the folder path
+            # Get the folder name.
+            query = os.path.basename(os.path.dirname(query))
+        else:
+            os.chdir(query)
+             # Get the folder name.
+            query = os.path.basename(query)
+        # If the folder name contains spaces:
+        if " " in query:
+            # Remove hyphens so that terms aren't excluded.
+            query = query.replace("-", "")
+        
+    print('Query = ' + query)
+    query = query.replace("https://vgmdb.net/album/", "")
+    if(query.isnumeric()):
+      soup = Soup(session.get("https://vgmdb.net/album/" + query).content)
+    else:
+      soup = Soup(session.get("https://vgmdb.net/search?q=" + query).content)
+      while(soup.title.text[:6] == "Search"):
+        #print(soup)
+        
+        # Get all matches and split them into separate lines
+        #import re
+        matches = re.findall('href="http://vgmdb.net/album/\d+"\s+title="([^"]+)"', soup.prettify())  
+        if len(matches) > 0:
+            print("Here are the search results:")
+            for idx, match in enumerate(matches, start=1):
+                print(f"{idx}. {match}")
+            while True:
+                try:
+                    query = input("Enter the number of the match you want or a different query: ")
+                    matchIndex = int(query) - 1  # Adjust for 0-based indexing
+                    if 0 <= matchIndex < len(matches):
+                        query = '"' + matches[matchIndex] + '"'
+                        break
+                    else:
+                        print("Invalid number. Please enter a valid match number.")
+                except ValueError:
+                    print(f"Input is not an integer. Using new query: {query}")
+                    break
+        else:
+            query = input("Enter a different query: ")
+        
+        soup = Soup(session.get("https://vgmdb.net/search?q=" + query).content)
+        #print("stuck at search results")
+        #exit(1)
+    print('Title: ' + soup.title.text)
+    folder = "Scans (VGMdb)"
+    gallery = soup.find("div", attrs={"class" : "covertab",
+                                      "id" : "cover_gallery"})
+    for idx, scan in enumerate(gallery.find_all("a", attrs={"class": "highslide"}), start=1):
+      url = scan["href"]
+      title = remove(scan.text.strip(), "\"*/:<>?\|")
+      image = session.get(url).content
+      ensure_dir(folder + os.sep)
+      orderNumber = str(idx).zfill(2)
+      #from pathlib import Path
+      sourceFilename = Path(url).stem
+      filename = orderNumber + ' ' + title + ' [' + sourceFilename + ']' + url[-4:]
+      with open(os.path.join(folder, filename), "wb") as f:
+          f.write(image)
+
+      print(title + " downloaded")
+    pickle.dump(session, open(config, "wb"))
+
+#import sys
+if len(sys.argv) == 1:
+    downloadVGMDBArt(input("Enter the VGMdb URL ID or search query for which you want to download album art: "))
+else:
+    for arg in sys.argv[1:]:
+        downloadVGMDBArt(f"{arg}")

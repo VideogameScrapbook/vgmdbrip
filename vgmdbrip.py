@@ -65,10 +65,10 @@ def ensure_dir(f):
     if not os.path.exists(d):
         os.makedirs(d)
 
-
-if(len(argv) < 2):
-    print("usage: " + argv[0] + " vgmdb_album_id")
-    raise SystemExit(1)
+# Commenting this out to allow prompt approach.
+#if(len(argv) < 2):
+#    print("usage: " + argv[0] + " vgmdb_album_id")
+#    raise SystemExit(1)
 
 login()
 soup = ""
@@ -89,44 +89,53 @@ def downloadVGMDBArt(query):
             # Remove hyphens so that terms aren't excluded.
             query = query.replace("-", "")
         
-    print('Query = ' + query)
-    query = query.replace("https://vgmdb.net/album/", "")
-    if(query.isnumeric()):
-      soup = Soup(session.get("https://vgmdb.net/album/" + query).content)
-    else:
-      soup = Soup(session.get("https://vgmdb.net/search?q=" + query).content)
-      while(soup.title.text[:6] == "Search"):
-        #print(soup)
-        
-        # Get all matches and split them into separate lines
-        #import re
-        matches = re.findall('href="http://vgmdb.net/album/\d+"\s+title="([^"]+)"', soup.prettify())  
-        if len(matches) > 0:
-            print("Here are the search results:")
-            for idx, match in enumerate(matches, start=1):
-                print(f"{idx}. {match}")
-            while True:
-                try:
-                    query = input("Enter the number of the match you want or a different query: ")
-                    matchIndex = int(query) - 1  # Adjust for 0-based indexing
-                    if 0 <= matchIndex < len(matches):
-                        query = '"' + matches[matchIndex] + '"'
-                        break
-                    else:
-                        print("Invalid number. Please enter a valid match number.")
-                except ValueError:
-                    print(f"Input is not an integer. Using new query: {query}")
-                    break
-        else:
-            query = input("Enter a different query: ")
+    while True:
+        #print('Query: ' + query)
+        query = query.replace("https://vgmdb.net/album/", "")
+        if(query.isdigit()):
+            soup = Soup(session.get("https://vgmdb.net/album/" + query).content)
+            break
         
         soup = Soup(session.get("https://vgmdb.net/search?q=" + query).content)
-        #print("stuck at search results")
-        #exit(1)
-    print('Title: ' + soup.title.text)
+        if(soup.title.text[:6] != "Search"):
+            break
+        else:
+            soupText = soup.prettify()
+            #print(soupText)
+            
+            # Get all matches and split them into separate lines
+            #import re
+            matches = re.findall('href="http://vgmdb.net/album/\d+"\s+title="([^"]+)"', soupText)
+            ids = re.findall('href="http://vgmdb.net/album/(\d+)"\s+title="[^"]+"', soupText)
+            if len(matches) > 0:
+                print("Here are the search results:")
+                for idx, match in enumerate(matches, start=1):
+                    print(f"{idx}. {match}")
+                while True:
+                    query = input("Enter the number of the match you want or a different query: ")
+                    
+                    if(not query.isdigit()):
+                        print(f"Input is not an integer. Using new query: {query}")
+                        break
+                    else:
+                        matchIndex = int(query)
+                        
+                        # Adjust for 0-based indexing.
+                        matchIndex -= 1
+                        
+                        if 0 <= matchIndex < len(matches):
+                            query = ids[matchIndex]
+                            break
+                        else:
+                            print("Invalid number. Please enter a valid match number.")
+                            continue                        
+            else:
+                query = input("Enter a different query: ")
+                continue            
+    
+    #print('Title: ' + soup.title.text)
     folder = "Scans (VGMdb)"
-    gallery = soup.find("div", attrs={"class" : "covertab",
-                                      "id" : "cover_gallery"})
+    gallery = soup.find("div", attrs={"class" : "covertab", "id" : "cover_gallery"})
     for idx, scan in enumerate(gallery.find_all("a", attrs={"class": "highslide"}), start=1):
       url = scan["href"]
       title = remove(scan.text.strip(), "\"*/:<>?\|")

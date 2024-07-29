@@ -10,6 +10,6 @@
 
 @REM WARNING: %~dp0 seems to return first parameter's folder instead of script's folder when the batch file is called by a different script.
 @REM https://stackoverflow.com/a/16144756
-@python.exe -3 "%~dpn0.py" %*
+@py -3 "%~dpn0.py" %*
 
 @REM PAUSE

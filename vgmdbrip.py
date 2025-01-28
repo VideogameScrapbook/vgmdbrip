@@ -212,7 +212,7 @@ def download_vgmdb_art(query):
         filename += url[-4:]        
         if idx == 1 and create_folder_image:
             # Use .jpg regardless of file extension as cheat to ensure Windows shows it as folder thumbnail.
-            folder_image_filename = "folder.jpg"
+            folder_image_filename = "Folder.jpg"
             # Use this instead if you want to use proper filename.
             #folder_image_filename = f"folder{url[-4:]}"
             if not os.path.exists(folder_image_filename):

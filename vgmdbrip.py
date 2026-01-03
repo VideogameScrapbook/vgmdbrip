@@ -40,7 +40,7 @@ first_image_saved = {
 
 import re
 
-scriptdir = os.path.dirname(argv[0])
+scriptdir = os.path.dirname(os.path.abspath(argv[0])) if argv[0] else os.getcwd()
 config = os.path.join(scriptdir, 'vgmdbrip.pkl')
 session = requests.Session()
 
@@ -115,7 +115,7 @@ def ensure_dir(f):
 
 login()
 soup = ""
-if default_download_to_script_directory:
+if default_download_to_script_directory and os.getcwd() == os.path.dirname(os.path.abspath(__file__)):
     os.chdir(scriptdir)
 
 def download_vgmdb_art(query):
@@ -247,6 +247,8 @@ def download_vgmdb_art(query):
                     with open(os.path.join(folder, filename), "wb") as f:
                         f.write(image)
                     print(title + " downloaded.")
+                else:
+                    print(f"{filename} already exists, skipping")
             elif "Back" in filename and not first_image_saved["Back"]:
                 back_path = f"{back_image_filename}.jpg"
                 back_shortcut = f"{filename} - Shortcut.lnk"
@@ -277,15 +279,13 @@ def download_vgmdb_art(query):
                 # Extract disc number if present, otherwise use empty string
                 disc_match = re.search(r"Disc(?:\s+(\d+))?", filename.split(' - ')[0].strip())
                 disc_num = disc_match.group(1) if disc_match and disc_match.group(1) else ""
-                # Save disc image in root folder
+                # Save disc image in root folder as "Disc {number}.jpg"
                 if disc_num:
-                    # For numbered discs, use full filename
-                    disc_filename = filename
+                    disc_filename = f"{disc_image_filename} {disc_num}.jpg"
                 else:
-                    # For standalone "Disc", use "Disc.jpg"
                     disc_filename = f"{disc_image_filename}.jpg"
-                shortcut_filename = f"{filename} - Shortcut.lnk"
-                disc_key = filename  # Use filename as unique key
+                shortcut_filename = f"{disc_filename} - Shortcut.lnk"
+                disc_key = disc_filename  # Use simplified filename as unique key
                 if disc_key not in first_image_saved["Disc"] and not os.path.exists(os.path.join(folder, shortcut_filename)) and not os.path.exists(disc_filename):
                     with open(disc_filename, "wb") as f:
                         f.write(image)
@@ -358,9 +358,7 @@ def create_shortcut(shortcut_target, shortcut_path="", shortcut_windows_style=Tr
         shortcut.WorkingDirectory = os.path.dirname(target_abs)
         shortcut_type = "Absolute"
 
-    # Set icon to the target file
-    shortcut.IconLocation = f'{target_abs},0'
-
+    # Don't set IconLocation to allow Windows auto-detection (like native shortcuts)
     shortcut.Save()
 
     print(f"{shortcut_type} shortcut created: {shortcut_filepath}")
